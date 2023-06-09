@@ -1,0 +1,126 @@
+frameworkVersion: '3'
+configValidationMode: error
+
+service: scheduled-step-function
+
+package:
+  individually: true
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-prune-plugin
+  - serverless-offline
+  - serverless-step-functions
+
+custom:
+  prune:
+    automatic: true
+    number: 3
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  stage: ${opt:stage, 'dev'}
+  stackName: scheduled-step-function-${self:provider.stage}
+  logRetentionInDays: 90
+  environment:
+    ENV: ${self:provider.stage}
+    REGION: ${aws:region}
+
+functions:
+  http-endpoint:
+    name: http-endpoint-${self:provider.stage}
+    handler: src/functions/hello/handler.handler
+    events:
+      - http:
+          path: /http-endpoint/hello
+          method: post
+          cors: true
+    timeout: 30
+  scheduled-step-function-one:
+    name: scheduled-step-function-one-${self:provider.stage}
+    handler: src/functions/step-1/handler.handler
+    timeout: 30
+  scheduled-step-function-two:
+    name: scheduled-step-function-two-${self:provider.stage}
+    handler: src/functions/step-2/handler.handler
+    timeout: 30
+  catch-error:
+    name: catch-error-${self:provider.stage}
+    handler: src/functions/catch-error/handler.handler
+    timeout: 30
+
+stepFunctions:
+  stateMachines:
+    myStateMachine:
+      name: MyStateMachine
+      definition:
+        Comment: A description of my state machine
+        StartAt: Parallel
+        States:
+          Parallel:
+            Type: Parallel
+            End: true
+            Branches:
+              - StartAt: Lambda Invoke
+                States:
+                  Lambda Invoke:
+                    Type: Task
+                    Resource: arn:aws:states:::lambda:invoke
+                    OutputPath: $
+                    Parameters:
+                      Payload.$: $
+                      FunctionName: >-
+                        arn:aws:lambda:${aws:region}:${aws:accountId}:function:scheduled-step-function-one-${self:provider.stage}:$LATEST
+                    Retry:
+                      - ErrorEquals:
+                          - Lambda.ServiceException
+                          - Lambda.AWSLambdaException
+                          - Lambda.SdkClientException
+                          - Lambda.TooManyRequestsException
+                        IntervalSeconds: 2
+                        MaxAttempts: 6
+                        BackoffRate: 2
+                    Next: Pass
+                  Pass:
+                    Type: Pass
+                    Next: Lambda Invoke (1)
+                  Lambda Invoke (1):
+                    Type: Task
+                    Resource: arn:aws:states:::lambda:invoke
+                    OutputPath: $
+                    Parameters:
+                      Payload.$: $
+                      FunctionName: >-
+                        arn:aws:lambda:${aws:region}:${aws:accountId}:function:scheduled-step-function-two-${self:provider.stage}:$LATEST
+                    Retry:
+                      - ErrorEquals:
+                          - Lambda.ServiceException
+                          - Lambda.AWSLambdaException
+                          - Lambda.SdkClientException
+                          - Lambda.TooManyRequestsException
+                        IntervalSeconds: 2
+                        MaxAttempts: 6
+                        BackoffRate: 2
+                    End: true
+            Catch:
+              - ErrorEquals: ['States.ALL']
+                Next: Lambda Invoke (2)
+          Lambda Invoke (2):
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            OutputPath: $
+            Parameters:
+              Payload.$: $
+              FunctionName: >-
+                arn:aws:lambda:${aws:region}:${aws:accountId}:function:catch-error-${self:provider.stage}:$LATEST
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 2
+                MaxAttempts: 6
+                BackoffRate: 2
+            End: true

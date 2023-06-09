@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "es2019",
+    "lib": ["es2019", "dom"],
+    "types": ["aws-lambda"],
+    "skipLibCheck": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "emitDecoratorMetadata": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "allowJs": false,
+    "noImplicitAny": true,
+    "outDir": "dist",
+    "baseUrl": "./",
+    "strict": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "strictPropertyInitialization": false,
+    "esModuleInterop": true
+  }
+}
